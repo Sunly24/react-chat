@@ -8,6 +8,7 @@ const Chat = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [socket, setSocket] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]); // Add this state to track online users
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const { user, logout, getToken } = useAuth();
@@ -38,6 +39,11 @@ const Chat = () => {
 
     newSocket.on("user-left", (data) => {
       console.log(`${data.username} left the chat`);
+    });
+
+    // Add listener for online users update
+    newSocket.on("users-update", (users) => {
+      setOnlineUsers(users);
     });
 
     newSocket.on("user-typing", (data) => {
@@ -162,6 +168,11 @@ const Chat = () => {
     }
   };
 
+  // Helper function to check if a user is online
+  const isUserOnline = (username) => {
+    return onlineUsers.some((u) => u.username === username);
+  };
+
   const TypingIndicator = () => {
     if (typingUsers.length === 0) return null;
 
@@ -232,6 +243,47 @@ const Chat = () => {
     );
   };
 
+  // Profile Circle component with online status
+  const ProfileCircle = ({ username, showOnlineStatus = true }) => {
+    const userColor = getUserColor(username);
+    const online = isUserOnline(username);
+
+    return (
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <div
+          style={{
+            width: "30px",
+            height: "30px",
+            backgroundColor: userColor,
+            color: "white",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: "bold",
+            fontSize: "14px",
+          }}
+        >
+          {username.charAt(0).toUpperCase()}
+        </div>
+        {showOnlineStatus && (
+          <div
+            style={{
+              width: "10px",
+              height: "10px",
+              borderRadius: "50%",
+              backgroundColor: online ? "#44b700" : "#bdbdbd",
+              border: "2px solid white",
+              position: "absolute",
+              bottom: "-2px",
+              right: "-2px",
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       style={{
@@ -256,9 +308,12 @@ const Chat = () => {
       >
         <div>
           <h1 style={{ margin: "0", fontSize: "1.5rem" }}>Chat App</h1>
-          <p style={{ margin: "0", fontSize: "0.9rem", opacity: "0.9" }}>
-            Welcome, {user.username}!
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ProfileCircle username={user.username} showOnlineStatus={true} />
+            <p style={{ margin: "0", fontSize: "0.9rem", opacity: "0.9" }}>
+              Welcome, {user.username}!
+            </p>
+          </div>
         </div>
         <button
           onClick={handleLogout}
@@ -307,49 +362,67 @@ const Chat = () => {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: isMyMessage ? "flex-end" : "flex-start",
-                marginBottom: "15px",
+                marginBottom: "20px",
               }}
             >
-              {/* Username and time label */}
+              {/* Username label */}
               <div
                 style={{
                   fontSize: "12px",
                   color: "#666",
-                  marginBottom: "2px",
-                  paddingLeft: isMyMessage ? "0" : "15px",
-                  paddingRight: isMyMessage ? "15px" : "0",
+                  marginBottom: "4px",
+                  paddingLeft: isMyMessage ? "0" : "5px",
+                  paddingRight: isMyMessage ? "5px" : "0",
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
+                  gap: "5px",
                 }}
               >
-                <span>{message.username || "Anonymous"}</span>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    color: "#999",
-                    fontWeight: "normal",
-                  }}
-                >
-                  {message.timestamp
-                    ? formatTime(message.timestamp)
-                    : formatTime(new Date())}
-                </span>
+                {!isMyMessage && <span>{message.username || "Anonymous"}</span>}
+                {isMyMessage && <span>{message.username || "Anonymous"}</span>}
               </div>
 
-              {/* Message bubble */}
+              {/* Message bubble with profile */}
               <div
                 style={{
-                  backgroundColor: isMyMessage ? "#007bff" : userColor,
-                  color: "white",
-                  padding: "10px 15px",
-                  borderRadius: "18px",
-                  maxWidth: "70%",
-                  wordWrap: "break-word",
-                  fontSize: "14px",
+                  display: "flex",
+                  flexDirection: isMyMessage ? "row-reverse" : "row",
+                  alignItems: "flex-end",
+                  gap: "8px",
+                  maxWidth: "85%",
                 }}
               >
-                {message.message}
+                <ProfileCircle username={message.username || "Anonymous"} />
+                <div
+                  style={{
+                    backgroundColor: isMyMessage ? "#007bff" : userColor,
+                    color: "white",
+                    padding: "10px 15px",
+                    borderRadius: isMyMessage
+                      ? "18px 0px 18px 18px"
+                      : "0px 18px 18px 18px",
+                    wordWrap: "break-word",
+                    fontSize: "14px",
+                  }}
+                >
+                  {message.message}
+                </div>
+              </div>
+
+              {/* Timestamp below message */}
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "#999",
+                  marginTop: "4px",
+                  alignSelf: isMyMessage ? "flex-end" : "flex-start",
+                  paddingLeft: isMyMessage ? "0" : "40px", // Add padding to align with message
+                  paddingRight: isMyMessage ? "40px" : "0", // Add padding to align with message
+                }}
+              >
+                {message.timestamp
+                  ? formatTime(message.timestamp)
+                  : formatTime(new Date())}
               </div>
             </div>
           );
